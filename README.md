@@ -1,5 +1,5 @@
 # WaveTransformer Repository
-Welcome to the repository of the WaveTransformer.
+Welcome to the repository of the paper [WaveTransformer: A Novel Architecture for Audio Captioning Based on Learning Temporal and Time-Frequency Information](https://arxiv.org/abs/2010.11098) 
 If you want to reproduce the results of the paper and know what you are doing, then jump ahead, get the pre-trained weights from [here](https://github.com/haantran96/wavetransformer/tree/main/outputs/models) and run the inference code as shown [here](#using-the-pre-trained-weights-for-inference)
 If you want to re-train WaveTransformer, then you can use the master branch, as it has the code based on the most up-to-date version of PyTorch.
 
@@ -30,21 +30,15 @@ $ git clone git@github.com:haantran96/wavetransformer.git
 ```
 To install the dependencies, you can use pip. It is advisable to run this system with a virtual environment to avoid package conflicts
 ```
-$ pip install -r requirements_pip.txt
+$ pip install -r requirement_pip.txt
 ```
 
 ## Dataset setup
 Please go to DCASE2020's Baseline repository, part [Preparing the data](https://github.com/audio-captioning/dcase-2020-baseline#preparing-the-data) to download and set up the data.
 
 ## Create a dataset
-To create the dataset, you can either run the script processes/dataset.py using the command:
-```
-$ python processes/dataset.py
-```
-or run the system using the main.py script. In any case, the dataset creation will start.
-
-You can select if you want to have the validation of the data by altering the `validate_dataset` parameter at the `settings/dataset_creation.yaml` file.
-
+Clone [this repository](https://github.com/audio-captioning/clotho-dataset) and follow its instructions to create dataset.
+  
 The result of the dataset creation process will be the creation of the directories:
 
     1. `data/data_splits`,
@@ -54,16 +48,11 @@ The result of the dataset creation process will be the creation of the directori
 
 The directories in data/data_splits have the input and output examples for the optimization and assessment of the baseline DNN. The data/pickles directory holds the pickle files that have the frequencies of the words and characters (so one can use weights in the objective function) and the correspondence of words and characters with indices.
 
-Note bold: Once you have created the dataset, there is no need to create it every time. That is, after you create the dataset using the baseline system, then you can set
-```
-workflow:
-  dataset_creation: No
-```
-at the `settings/main_settings.yaml` file.
 
 ## Using the pre-trained weights for inference
 The pre-trained weights are stored at [outputs/models directory](https://github.com/haantran96/wavetransformer/tree/main/outputs/models). Please be noted that the pre-trained weights are different for each different model.
-
+**Note bold**: To use the caption evaluate tools you need to have Java installed and enabled.
+Before being able to run the code for the evaluation of the predictions, you have first to run the script `get_stanford_models.sh` in the `coco_caption` directory.
 In the `settings` folder, there are the following files:
 1. `dirs_and_files.yaml`: Stores the locations of the according files. For example:
 ```
@@ -87,14 +76,11 @@ dataset:
     evaluation: *eva
     validation: *val
   annotations_dir: 'clotho_csv_files'
-  pickle_files_dir: 'pickles'
+  pickle_files_dir: 'WT_pickles'
   files:
     np_file_name_template: 'clotho_file_{audio_file_name}_{caption_index}.npy'
-    words_list_file_name: 'words_list.p'
-    words_counter_file_name: 'words_frequencies.p'
-    characters_list_file_name: 'characters_list.p'
-    characters_frequencies_file_name: 'characters_frequencies.p'
-    validation_files_file_name: 'validation_file_names.p'
+    words_list_file_name: 'WT_words_list.p'
+    characters_list_file_name: 'WT_characters_list.p'
 # -----------------------------------
 model:
   model_dir: 'models'
@@ -108,26 +94,34 @@ logging:
 
 Most important directories are: `feature_dirs/output` and `model`, as you must specify the locations of the `/data` and model paths according. Noted: by default, the code will save current best model as `best_checkpoint_model_name.pt`, so it is advisable to always set `model/pre_trained_model_name` as `best_checkpoint_model_name.pt`.
 
-2. `main_settings.yaml`. As mentioned, if you have already created the database, please set `dataset_creation: No`. For inference, please set `dnn_training: No` as shown below:
+**Note bold 2**: To obtain the exactly same results as we had in the paper, please use the same [word indices and character indices](https://github.com/haantran96/wavetransformer/tree/main/data/WT_pickles) that we had already generated.
+
+Then, please specify the directory as shown in the dirs_and_files.yaml:
+```
+...
+  pickle_files_dir: 'WT_pickles'
+  files:
+    np_file_name_template: 'clotho_file_{audio_file_name}_{caption_index}.npy'
+    words_list_file_name: 'WT_words_list.p'
+    characters_list_file_name: 'WT_characters_list.p'
+...
+```
+
+
+2. `main_settings_$ID.yaml`. For inference, please set `dnn_training: No` as shown below:
 ```
 workflow:
-  dataset_creation: No
   dnn_training: No
   dnn_evaluation: Yes
-# ---------------------------------
-dataset_creation_settings: !include dataset_creation.yaml
-# -----------------------------------
-feature_extraction_settings: !include feature_extraction.yaml
-# -----------------------------------
 dnn_training_settings: !include method.yaml
 # -----------------------------------
 dirs_and_files: !include dirs_and_files.yaml
 # EOF
 ```
 
-3. `method.yaml`: contain different hyperparameters. This is the setting for the best models:
+3. `method_$ID.yaml`: contain different hyperparameters. This is the setting for the best models:
 ```
-model: !include model.yaml
+model: !include model_$ID.yaml
 # ----------------------
 data:
   input_field_name: 'features'
@@ -152,27 +146,18 @@ training:
   force_cpu: No
   text_output_every_nb_epochs: !!int 10
   nb_examples_to_sample: 100
-  use_class_weights: Yes
   use_y: Yes
   clamp_value_freqs: -1  # -1 is for ignoring
   # EOF
 ```
-4. `model.yaml`: The settings are different for different models. However, this line should be set to "Yes" to do the inference:
+4. `model_$ID.yaml`: The settings are different for different models. However, this line should be set to "Yes" to do the inference:
 ```use_pre_trained_model: Yes```
 
 *Please use the according files for reference:
-- `best_model_16_3_9.pt`: [model_ht_12_16_3.yaml](https://github.com/haantran96/wavetransformer/blob/main/settings/model_ht_12_16_3.yaml)
-- `best_model_37_8.pt`: [model_ht_12_37.yaml](https://github.com/haantran96/wavetransformer/blob/main/settings/model_ht_12_37.yaml)
-- `best_model_43_3.pt`: [model_ht_12_37.yaml](https://github.com/haantran96/wavetransformer/blob/main/settings/model_ht_12_37.yaml)
-However, these hyperparameters should be changed as:
-```
-  inner_kernel_size_encoder: 5
-  inner_padding_encoder: 2
-  pw_kernel_encoder: 5
-  pw_padding_encoder: 2
-```
-- `best_model_44_7.pt`: [model_ht_12_37.yaml](https://github.com/haantran96/wavetransformer/blob/main/settings/model_ht_12_37.yaml)
-However, these hyperparameters should be changed as:
+- `best_model_43_3.pt`: [WT](https://github.com/haantran96/wavetransformer/blob/main/settings/model_ht_12_37.yaml)
+- `best_model_16_3_9.pt`: [WT_temp](https://github.com/haantran96/wavetransformer/blob/main/settings/model_ht_12_16_3.yaml)
+- `best_model_44_7.pt`: [WT_avg](https://github.com/haantran96/wavetransformer/blob/main/settings/model_ht_12_37.yaml)
+Please change accordingly to the following hyperparameters:
 ```
   inner_kernel_size_encoder: 5
   inner_padding_encoder: 2
@@ -180,31 +165,30 @@ However, these hyperparameters should be changed as:
   pw_padding_encoder: 2
   merge_mode_encoder: 'mean'
 ```
-- `best_model_39_5.pt`: [model_ht_12_39.yaml](https://github.com/haantran96/wavetransformer/blob/main/settings/model_ht_12_39.yaml)
-- `best_model_38_5.pt`: [model_ht_12_39.yaml](https://github.com/haantran96/wavetransformer/blob/main/settings/model_ht_12_39.yaml)
-However, these hyperparameters should be changed as:
-```
-  inner_kernel_size_encoder: 5
-  inner_padding_encoder: 2
-```
+- `best_model_38_5.pt`: [WT_tf](https://github.com/haantran96/wavetransformer/blob/main/settings/model_ht_12_39.yaml)
+
+***For beam search:*** In order to use beam search, please set in the yaml model files:
+
+```beam_size: 2``` or larger than 1
+
+Our results are obtained with beam size 2. You can set the beam size larger, but inference time can vary.
 
 Finally, to run the whole inference code:
 ```
-python main.py -c main_settings -j $ID
+python main.py -c main_settings_$ID -j $id_nr
 ```
-`main_settings` should be the same name with your `main_settings.yaml` file.
+`main_settings_$ID` should be the same name with your `main_settings_$ID.yaml` file.
 
 ## Re-training WaveTransformer
 The process for retraining are the same like inference. However, you must change as the following:
-1. `main_settings.yaml`. As mentioned, if you have already created the database, please set `dataset_creation: No`. For training, please set `dnn_training: Yes` as shown below:
+1. `main_settings_$ID.yaml`:
 ```
 workflow:
-  dataset_creation: No
   dnn_training: Yes
   dnn_evaluation: Yes
 ```
-2. `method.yaml`: make changes as to the indicated hyperparameters
-3. `model.yaml`: this line should be set to "No" to do the training (from scratch):
+2. `method_$ID.yaml`: make changes as to the indicated hyperparameters
+3. `model_$ID.yaml`: this line should be set to "No" to do the training (from scratch):
 
 ```use_pre_trained_model: No```
 
@@ -215,3 +199,4 @@ The implementation of the codebase is adapted (with some modifications) from the
 1. For WaveNet implementation: https://www.kaggle.com/c/liverpool-ion-switching/discussion/145256
 2. For Transformer implementation: https://nlp.seas.harvard.edu/2018/04/03/attention.html
 3. For beam search decoding: https://github.com/budzianowski/PyTorch-Beam-Search-Decoding
+4. For Depthwise separable convolution implementation: https://github.com/dr-costas/dnd-sed
